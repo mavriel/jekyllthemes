@@ -1,59 +1,308 @@
----
-layout: default
-title: Jekyll Themes
----
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css" />
+  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.7.0/fullcalendar.min.css' />
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.19.2/moment.min.js'></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  <script src='https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.7.0/fullcalendar.min.js'></script>
 
-<div class="gallery">
-	{% for post in paginator.posts %}
-		<div class="item">
-			<a class="item-inner" href="{{ post.url }}">
-				<div class="item-image"><img src="/thumbnails/{{ post.thumbnail }}"></div>
-				<div class="item-name">{{ post.title }}</div>
-			</a>
-		</div>
-	{% endfor %}
-</div>
-
-<!-- Pager -->
-
-<div class="row-fluid">
-  <div class="span12">
-    <div class="pagination">
-      <ul>
-        {% if paginator.previous_page %}
-
-          {% if paginator.previous_page == 1 %}
-            <li><a href="/">Prev</a></li>
-          {% else %}
-            <li><a href="/page{{ paginator.previous_page }}">Prev</a></li>
-          {% endif %}
-
-        {% else %}
-          <li><span class="disabled">Prev</span></li>
-        {% endif %}
-
-        {% if paginator.page == 1 %}
-          <li><span class="active">1</span></li>
-        {% else %}
-          <li><a href="/">1</a></li>
-        {% endif %}
-
-        {% for count in (2..paginator.total_pages) %}
-
-          {% if count == paginator.page %}
-            <li><span class="active">{{ count }}</span></li>
-          {% else %}
-            <li><a href="/page{{ count }}">{{ count }}</a></li>
-          {% endif %}
-        {% endfor %}
-
-        {% if paginator.next_page %}
-          <li><a href="/page{{ paginator.next_page }}">Next</a></li>
-        {% else %}
-          <li><span class="disabled">Next</span></li>
-        {% endif %}
-      </ul>
-    </div>
+  <style type="text/css">
+    #overlay_t { background-color: #000; bottom: 0; left: 0; opacity: 0.5; filter: alpha(opacity = 50); /* IE7 & 8 */ position: fixed; right: 0; top: 0; z-index: 99; display:none;}
+    #popup_layer { padding:20px; word-break: keep-all; width:400px; height:400px; margin-bottom:30px; background:#fff; border:solid 1px #ccc; position:absolute; top:100px; left:50%; margin-left:-200px; box-shadow: 0px 1px 20px #333; z-index:100; display:none;}
+  </style>
+  <title>Doctors</title>
+</head>
+<body>
+<form id="fileOpen" onsubmit="return false;">
+  <div>
+    <input type="file" id="csvFile">
   </div>
-</div>
+  <div>
+    <input type="submit" value="파일 분석">
+  </div>
+</form>
+<div id="calendar"></div>
+<div id="overlay_t"></div>
+<div id="popup_layer"></div>
+</body>
 
+<script>
+  var timeTable;
+  var timeTypes = [
+    {
+      id: 'A',
+      color: 'green',
+      order: 1,
+    }, {
+      id: 'B',
+      color: 'orange',
+      order: 2,
+    },
+  ];
+  var customButtons;
+  $(document).ready(function () {
+    $('#fileOpen').on('submit', function (e) {
+      e.preventDefault();
+
+      var csvFile = document.getElementById('csvFile');
+      if(!csvFile || !csvFile.files || csvFile.files.length === 0) {
+        alert("파일을 선택해 주세요");
+        return;
+      }
+      parseFile(csvFile.files[0]);
+      $('#fileOpen').hide();
+    });
+
+    $('#overlay_t, .close').click(function(e){
+      e.preventDefault();
+      $('#popup_layer, #overlay_t').hide();
+    });
+  });
+
+  function makeEventData(workers, date, color) {
+    return {
+      title: workers.join(' '),
+      start: date,
+      color: color,
+    }
+  }
+
+  function isEnableDoctor(doctor, roomId) {
+    return doctor.rooms.indexOf(roomId) !== -1;
+  }
+
+  function makeEventList(timeTable, roomId) {
+    var roomData = timeTable.rooms[roomId].timeTable;
+    var doctors = timeTable.doctors;
+    var doctorIds = Object.keys(doctors);
+    var yearMonth = timeTable.startDate.format('YYYYMM');
+    var startDay = timeTable.startDate.get('date');
+    var endDay = timeTable.endDate.get('date');
+
+    var eventData = [];
+
+    for(var day=startDay; day<=endDay; day++) {
+      var currDate = moment(yearMonth+day, 'YYYYMMDD');
+      var roomTimeTable = roomData[currDate.format('YYYYMMDD')];
+
+      timeTypes.forEach(function (type) {
+        var startTime = moment(currDate).add(type.order, 'hours');
+        var dateTime = currDate.format('YYYYMMDD')+type.id;
+        var workers =[];
+        var minorWorkers = [];
+
+        for(var i=0; i<doctorIds.length; i++) {
+          var doctor = doctors[doctorIds[i]];
+
+          if(isEnableDoctor(doctor, roomId)) {
+            var workRooms = doctor.timeTable[dateTime];
+
+            if(workRooms) {
+              if(workRooms.length === 1 && workRooms[0] === roomId) {
+                workers.push(doctor.name);
+              }
+            } else {
+              minorWorkers.push(doctor.name);
+            }
+          }
+        }
+        workers.push('/');
+        Array.prototype.push.apply(workers, minorWorkers);
+
+        eventData.push(makeEventData(workers, startTime.format(), type.color));
+      });
+    }
+
+    $('#calendar').fullCalendar( 'removeEvents' );
+    $('#calendar').fullCalendar( 'renderEvents', eventData );
+  }
+
+  function getTimeType(time) {
+    if(time >= 9 && time <= 12) {
+      return timeTypes[0].id;
+    } else {
+      return timeTypes[1].id;
+    }
+  }
+
+  function parseFile(file) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      // 처방일|진료과|의사|사번|의사명|주민번호|병동|시간
+      var lines = e.target.result.split('\n');
+      if(lines.length < 1) {
+        alert('잘못된 파일입니다.');
+        return;
+      }
+
+      var yearMonth = lines[1].split('|')[0].substr(-100,6);
+      timeTable = getTimeTable(lines);
+
+      customButtons = {};
+      var rooms = Object.keys(timeTable.rooms);
+      rooms.sort();
+
+      console.log(rooms);
+
+      for(var i=0; i<rooms.length; i++) {
+        console.log(rooms[i]);
+        customButtons[rooms[i]] = {
+          text: rooms[i],
+          click: onClickRoomId(rooms[i]),
+        }
+      }
+
+      $('#calendar').fullCalendar({
+        customButtons: customButtons,
+        header: {
+          left: 'title',
+          center: rooms.join(' '),
+          right: '',
+        },
+        defaultDate: yearMonth+'01',
+        titleFormat: 'YYYY년 MM월',
+        eventClick: function(event) {
+          showDetail(event.title);
+        },
+      });
+      $('.fc-'+rooms[0]+'-button').trigger('click');
+
+    };
+    reader.readAsText(file, 'euc-kr');
+  }
+
+  function onClickRoomId(roomId) {
+    return function () {
+      $('#calendar').fullCalendar('option', 'titleFormat', 'YYYY년 MM월 [-('+roomId+' 병동)]');
+      makeEventList(timeTable, roomId);
+    }
+  }
+
+  function getTimeTable(lines) {
+    var rooms = {};
+    var doctors = {};
+    var startDate;
+    var endDate;
+
+    for(var i=1; i<lines.length; i++) {
+      var line = lines[i];
+      if(line.length<8) {
+        continue;
+      }
+      var items = line.split('|');
+
+      if(items.length !== 8) {
+        console.log(line);
+        alert('잘못된 파일입니다.');
+        return;
+      }
+
+      var date = items[0];
+      var department = items[1];
+      var doctorId = items[2];
+      var employeeNumber = items[3];
+      var name = items[4];
+      var doctorId = items[5];
+      var roomId = items[6];
+      var time = items[7];
+      var timeType = getTimeType(time);
+      var dateTime = date+timeType;
+
+      if(i===1) {
+        startDate = moment(date).startOf('month');
+        endDate = moment(date).endOf('month');
+      }
+
+//        {
+//          doctor : {
+//            id: id,
+//            name: name,
+//            rooms: [roomId, ],
+//            timeTable: {
+//              dateTime: [roomId,],
+//            }
+//          },
+//          rooms : {
+//            roomId: {
+//              roomId: roomId,
+//              timeTable: {
+//                dateTime: [id, ],
+//              }
+//            }
+//          }
+//        }
+
+      if(!doctors[doctorId]) {
+        doctors[doctorId] = {
+          id: doctorId,
+          name: name,
+          rooms: [],
+          timeTable: {}
+        }
+      }
+      var doctor = doctors[doctorId];
+      addDoctorData(doctor, items);
+
+      if(!rooms[roomId]) {
+        rooms[roomId] = {
+          id: roomId,
+          timeTable: {}
+        }
+      }
+      var room = rooms[roomId];
+      addRoomData(room, items);
+    }
+
+    return {
+      rooms: rooms,
+      doctors: doctors,
+      startDate: startDate,
+      endDate: endDate,
+    }
+  }
+
+  function addDoctorData(doctor, data) {
+    var roomId = data[6];
+    var dateTime = data[0]+getTimeType(data[7]);
+
+    if(doctor.rooms.indexOf(roomId) === -1) {
+      doctor.rooms.push(roomId);
+    }
+    if(!doctor.timeTable[dateTime]) {
+      doctor.timeTable[dateTime] = [];
+    }
+    if(doctor.timeTable[dateTime].indexOf(roomId) === -1) {
+      doctor.timeTable[dateTime].push(roomId);
+    }
+  }
+
+  function addRoomData(room, data) {
+    var timeTable = room.timeTable;
+    var doctorId = data[5];
+    var date = data[0];
+    var timeType = getTimeType(data[7]);
+
+    if(!timeTable[date]) {
+      timeTable[date] = {};
+    }
+    if(!timeTable[date][timeType]) {
+      timeTable[date][timeType] = [];
+    }
+    if(timeTable[date][timeType].indexOf(doctorId) === -1) {
+      timeTable[date][timeType].push(doctorId);
+    }
+  }
+  
+  function showDetail(workers) {
+    $('#popup_layer').text(workers.replace('/','\n'));
+    $('#popup_layer, #overlay_t').show();
+//    $('#popup_layer').css("center", Math.max(0, $(window).scrollTop() + 100) + "px");
+
+     $('#popup_layer').css("center", Math.max(0, (($(window).height() - $(this).outerHeight()) / 2) + $(window).scrollTop()) + "px");
+  }
+</script>
+
+</html>
