@@ -36,11 +36,18 @@
       id: 'A',
       color: 'green',
       order: 1,
+      start: 0,
     }, {
       id: 'B',
       color: 'orange',
       order: 2,
-    },
+      start: 8,
+    }, {
+      id: 'C',
+      color: 'blue',
+      order: 3,
+      start: 18
+    }
   ];
   var customButtons;
   $(document).ready(function () {
@@ -89,7 +96,7 @@
       var roomTimeTable = roomData[currDate.format('YYYYMMDD')];
 
       timeTypes.forEach(function (type) {
-        var startTime = moment(currDate).add(type.order, 'hours');
+        var startTime = moment(currDate).add(type.start, 'hours');
         var dateTime = currDate.format('YYYYMMDD')+type.id;
         var workers =[];
         var minorWorkers = [];
@@ -101,9 +108,9 @@
             var workRooms = doctor.timeTable[dateTime];
 
             if(workRooms) {
-              if(workRooms.length === 1 && workRooms[0] === roomId) {
-                workers.push(doctor.name);
-              }
+//              if(workRooms.length === 1 && workRooms[0] === roomId) {
+//                workers.push(doctor.name);
+//              }
             } else {
               minorWorkers.push(doctor.name);
             }
@@ -121,10 +128,12 @@
   }
 
   function getTimeType(time) {
-    if(time >= 9 && time <= 12) {
-      return timeTypes[0].id;
+    if(time <= 7 ) {
+      return timeTypes[0].id
+    } else if(time <=17 ) {
+      return timeTypes[1].id
     } else {
-      return timeTypes[1].id;
+      return timeTypes[2].id
     }
   }
 
@@ -145,10 +154,7 @@
       var rooms = Object.keys(timeTable.rooms);
       rooms.sort();
 
-      console.log(rooms);
-
       for(var i=0; i<rooms.length; i++) {
-        console.log(rooms[i]);
         customButtons[rooms[i]] = {
           text: rooms[i],
           click: onClickRoomId(rooms[i]),
@@ -176,7 +182,7 @@
 
   function onClickRoomId(roomId) {
     return function () {
-      $('#calendar').fullCalendar('option', 'titleFormat', 'YYYY년 MM월 [-('+roomId+' 병동)]');
+      $('#calendar').fullCalendar('option', 'titleFormat', 'YYYY년 MM월 [- '+roomId+' 병동]');
       makeEventList(timeTable, roomId);
     }
   }
