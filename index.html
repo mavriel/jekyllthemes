@@ -18,9 +18,12 @@
 <body>
 <form id="fileOpen" onsubmit="return false;">
   <div>
+  </div>
+  <div>
     <input type="file" id="csvFile">
   </div>
   <div>
+    <input type="checkbox" id="timeType" checked> 8시기준 ------
     <input type="submit" value="파일 분석">
   </div>
 </form>
@@ -31,28 +34,69 @@
 
 <script>
   var timeTable;
-  var timeTypes = [
-    {
-      id: 'A',
-      color: 'green',
-      order: 1,
-      start: 0,
-    }, {
-      id: 'B',
-      color: 'orange',
-      order: 2,
-      start: 8,
-    }, {
-      id: 'C',
-      color: 'blue',
-      order: 3,
-      start: 18
-    }
+
+  var timeTypeList = [
+    [
+      {
+        id: 'A',
+        color: 'green',
+        order: 1,
+        start: 0,
+        end: 7,
+      }, {
+        id: 'B',
+        color: 'orange',
+        order: 2,
+        start: 8,
+        end: 17,
+      }, {
+        id: 'C',
+        color: 'blue',
+        order: 3,
+        start: 18,
+        end: 23,
+      }
+    ],
+    [
+      {
+        id: 'A',
+        color: 'green',
+        order: 1,
+        start: 0,
+        end: 5,
+      }, {
+        id: 'B',
+        color: 'orange',
+        order: 2,
+        start: 6,
+        end: 17,
+      }, {
+        id: 'C',
+        color: 'blue',
+        order: 3,
+        start: 18,
+        end: 23,
+      }
+    ]
   ];
+
+  var timeTypes = timeTypeList[0];
+  var titleExt = '8시 기준';
+
+  var separateRoomIds = ['0032', '0033', '0034', '0053', '0101', '0113'];
+
   var customButtons;
   $(document).ready(function () {
     $('#fileOpen').on('submit', function (e) {
       e.preventDefault();
+
+      if($('#timeType')[0].checked) {
+        timeTypes = timeTypeList[0];
+        titleExt = '8시 기준';
+      } else {
+        timeTypes = timeTypeList[1];
+        titleExt = '6시 기준';
+      }
 
       var csvFile = document.getElementById('csvFile');
       if(!csvFile || !csvFile.files || csvFile.files.length === 0) {
@@ -68,6 +112,14 @@
       $('#popup_layer, #overlay_t').hide();
     });
   });
+
+  function GetRoomId(id) {
+    if(separateRoomIds.indexOf(id) == -1) {
+      return '그외';
+    } else {
+      return id;
+    }
+  }
 
   function makeEventData(workers, date, color) {
     return {
@@ -128,13 +180,13 @@
   }
 
   function getTimeType(time) {
-    if(time <= 7 ) {
-      return timeTypes[0].id
-    } else if(time <=17 ) {
-      return timeTypes[1].id
-    } else {
-      return timeTypes[2].id
+    for(var i=0; i<timeTypes.length; i++) {
+      var type = timeTypes[0];
+      if(type.start <= time && time <= type.end) {
+        return type.id;
+      }
     }
+    return 'ext';
   }
 
   function parseFile(file) {
@@ -182,7 +234,7 @@
 
   function onClickRoomId(roomId) {
     return function () {
-      $('#calendar').fullCalendar('option', 'titleFormat', 'YYYY년 MM월 [- '+roomId+' 병동]');
+      $('#calendar').fullCalendar('option', 'titleFormat', 'YYYY년 MM월 [- '+roomId+' 병동 '+titleExt+' ]');
       makeEventList(timeTable, roomId);
     }
   }
@@ -212,7 +264,7 @@
       var employeeNumber = items[3];
       var name = items[4];
       var doctorId = items[5];
-      var roomId = items[6];
+      var roomId = GetRoomId(items[6]);
       var time = items[7];
       var timeType = getTimeType(time);
       var dateTime = date+timeType;
@@ -271,7 +323,7 @@
   }
 
   function addDoctorData(doctor, data) {
-    var roomId = data[6];
+    var roomId = GetRoomId(data[6]);
     var dateTime = data[0]+getTimeType(data[7]);
 
     if(doctor.rooms.indexOf(roomId) === -1) {
