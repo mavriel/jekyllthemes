@@ -181,7 +181,7 @@
 
   function getTimeType(time) {
     for(var i=0; i<timeTypes.length; i++) {
-      var type = timeTypes[0];
+      var type = timeTypes[i];
       if(type.start <= time && time <= type.end) {
         return type.id;
       }
